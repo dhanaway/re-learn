@@ -11,6 +11,9 @@ method at 1.7B, then scale to 14B.
 - `train.py`         — proper 1.7B GRPO run: 400 steps, constant LR, eval on the fixed val set every 25 steps -> `eval_history.json`. vLLM on (TRITON_ATTN backend).
 - `benchmark.py`     — before/after benchmark on the fixed val set (greedy, deterministic).
 - `plot_eval.py`     — plots the learning curve from `eval_history.json` -> `eval_curve.png`.
+- `uci_engine.py`    — wraps the model as a standard UCI engine (reusable for matches, fastchess, lichess-bot).
+- `elo.py`           — plays full games via the UCI engine and reports Elo (vs base / random / weak Stockfish).
+- `chess_reward_wdl.py` — alternative win-probability (WDL) reward to A/B against the centipawn reward.
 - `train_smoke.py`   — the original 30-step smoke test (kept for reference).
 
 ## One-time environment setup (vLLM fix)
@@ -36,6 +39,28 @@ runpodctl send eval_curve.png                   # pull the curve to your Mac
 On the held-out curve (`eval_curve.png`) and the before/after benchmark, all measured
 on the SAME fixed positions every time:
 - **top-1 match** rises, **avg centipawn loss** falls, **legal-move rate** trends toward ~100%.
+
+## Measuring Elo
+`uci_engine.py` exposes the model through the standard UCI protocol, so the whole
+computer-chess toolchain works with it. `elo.py` runs a gauntlet and reports Elo:
+```bash
+python elo.py ./qwen3-1.7b-chess-merged    # vs base (relative gain), random, weak Stockfish
+```
+- **"vs base"** is the headline RL-gain number (relative Elo, no calibration needed).
+- Tune game count with `ELO_GAMES=20 python elo.py ...` (more games = tighter CI, slower).
+- Every game is written to `elo_games.pgn` — feed it to **ordo** or **bayeselo** for
+  official ratings with confidence intervals, or plug `uci_engine.py` into **lichess-bot**
+  for a real Lichess rating once the model is strong enough (>~1320).
+
+## A/B the reward (centipawn vs WDL)
+The literature favors win-probability (WDL) over centipawn as the strength target.
+To try it, point `train.py` at the WDL reward and compare Elo before deciding:
+```python
+from chess_reward_wdl import chess_reward_wdl   # in train.py
+...
+reward_funcs = [chess_reward_wdl],
+```
+Run both versions, then `python elo.py` on each merged model — let Elo pick the winner.
 
 ## Scaling to 14B (after the 1.7B run proves the method)
 1. In `train.py`: apply the `[14B]` lines (`Qwen/Qwen3-14B`, `load_in_4bit=True`). vLLM is already on; the same flashinfer-uninstall + TRITON_ATTN fix applies. Lower `gpu_memory_utilization` if you hit OOM.

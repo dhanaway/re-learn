@@ -1,11 +1,17 @@
 # plot_eval.py
-# Plots the in-training learning curve from eval_history.json -> eval_curve.png
+# Plot the in-training learning curve. Defaults to eval_history.json (the cp run);
+# pass another file for other runs, e.g.:
+#   python plot_eval.py eval_history_wdl.json   ->  eval_curve_wdl.png
+import sys
 import json
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
-hist = json.load(open("eval_history.json"))
+src = sys.argv[1] if len(sys.argv) > 1 else "eval_history.json"
+out = src.replace("eval_history", "eval_curve").replace(".json", ".png")
+
+hist = json.load(open(src))
 steps = [h["step"] for h in hist]
 
 fig, axes = plt.subplots(1, 3, figsize=(14, 4))
@@ -20,7 +26,7 @@ for ax, key, title, is_pct in panels:
     if is_pct:
         ax.set_ylim(0, 1)
 
-fig.suptitle("Qwen3-1.7B chess GRPO — held-out eval")
+fig.suptitle(f"Qwen3 chess GRPO — held-out eval ({src})")
 fig.tight_layout()
-fig.savefig("eval_curve.png", dpi=120, bbox_inches="tight")
-print("wrote eval_curve.png")
+fig.savefig(out, dpi=120, bbox_inches="tight")
+print(f"wrote {out}")
