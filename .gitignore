@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+
+# Generated training artifacts
+qwen3-*-merged/
+chess_positions/
+val_fens.json
+eval_history.json
+
+# Model weights / large binaries
+*.ckpt
+*.pt
+*.bin
+*.safetensors
+
+# Logs & experiment tracking
+wandb/
+*.log
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/

@@ -1,0 +1,6 @@
+trl
+vllm
+datasets
+python-chess
+wandb
+huggingface_hub
