@@ -114,8 +114,10 @@ def match(trained, opp, opp_name, judge, limit, pgn_fh):
     w, d, l = results.count(1.0), results.count(0.5), results.count(0.0)
     score = sum(results) / n
     lo, hi = bootstrap_ci(results)
-    print(f"vs {opp_name:<14} {n} games  W-D-L = {w}-{d}-{l}  "
-          f"score = {score:5.1%}  ΔElo = {elo_diff(score, n):+.0f}  [{lo:+.0f}, {hi:+.0f}]")
+    line = (f"vs {opp_name:<14} {n} games  W-D-L = {w}-{d}-{l}  "
+            f"score = {score:5.1%}  ΔElo = {elo_diff(score, n):+.0f}  [{lo:+.0f}, {hi:+.0f}]")
+    print(line)
+    return line
 
 
 def selftest(engine, name, limit):
@@ -132,6 +134,7 @@ def main():
     judge = chess.engine.SimpleEngine.popen_uci(SF_PATH)   # full-strength adjudicator
     limit = chess.engine.Limit(time=0.1)                   # think time (model ignores it)
     pgn_fh = open(PGN_OUT, "w")
+    summary = []
 
     print(f"=== Elo gauntlet for {TRAINED} ({GAMES} games/opponent) ===")
     print("First move per model engine takes ~80s while vLLM loads...\n")
@@ -145,32 +148,46 @@ def main():
     try:
         base = model_engine("Qwen/Qwen3-1.7B")
         if selftest(base, "base", limit):
-            match(trained, base, "base", judge, limit, pgn_fh)
+            summary.append(match(trained, base, "base", judge, limit, pgn_fh))
+        else:
+            summary.append("vs base           skipped: engine self-test failed")
         safe_quit(base)
     except Exception as e:
-        print(f"  base match skipped: {e}")
+        summary.append(f"vs base           skipped: {e}")
 
     # 2) vs random mover (floor)
     try:
         rnd = model_engine("random")
-        match(trained, rnd, "random", judge, limit, pgn_fh)
+        summary.append(match(trained, rnd, "random", judge, limit, pgn_fh))
         safe_quit(rnd)
     except Exception as e:
-        print(f"  random match skipped: {e}")
+        summary.append(f"vs random         skipped: {e}")
 
     # 3) vs weak Stockfish (Skill Level 0)
     try:
         sf0 = chess.engine.SimpleEngine.popen_uci(SF_PATH)
         sf0.configure({"Skill Level": 0})
-        match(trained, sf0, "stockfish-sk0", judge, limit, pgn_fh)
+        summary.append(match(trained, sf0, "stockfish-sk0", judge, limit, pgn_fh))
         safe_quit(sf0)
     except Exception as e:
-        print(f"  stockfish match skipped: {e}")
+        summary.append(f"vs stockfish-sk0  skipped: {e}")
 
     safe_quit(trained)
     safe_quit(judge)
     pgn_fh.close()
-    print(f"\nAll games saved to {PGN_OUT}.")
+
+    # clean recap at the very end, so results aren't buried in vLLM startup noise
+    header = f"RESULTS  —  {TRAINED}  ({GAMES} games/opponent)"
+    print("\n" + "=" * len(header))
+    print(header)
+    print("=" * len(header))
+    for line in summary:
+        print(line)
+    with open("elo_results.txt", "a") as f:                 # append -> both runs accumulate
+        f.write(f"\n=== {TRAINED} ({GAMES} games/opponent) ===\n")
+        for line in summary:
+            f.write(line + "\n")
+    print(f"\nGames -> {PGN_OUT};  results appended to elo_results.txt (cat it to compare runs)")
 
 
 if __name__ == "__main__":
