@@ -1,0 +1,1 @@
+Jun 11: RL on qwen 1.7B made it better then base, but not by much
